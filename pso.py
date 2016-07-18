@@ -20,10 +20,10 @@ PSO method will attempt to find the minimum (0.0 in this case) by successive
 evaluation of the function, and the interaction between the set of these
 candidates.
 """
-
-import numpy as np
+# To ignore pylint's "numpy does not contains * member" errors:
+# pylint: disable=E1101
 import math
-import random
+import numpy as np
 
 
 class Candidate(object):
@@ -31,18 +31,18 @@ class Candidate(object):
     Canidate is a potential extrema in a n-dimentional space.
 
     In order to optimize a function using this module, the user must provide
-    an implementation of the Candidate class that has the methods evalFitness()
+    an implementation of the Candidate class that has the methods eval_fitness()
     and boundaries().
     """
 
-    def evalFitness(self, pos):
+    def eval_fitness(self, pos):
         """
-        evalFitness takes a position in the n-dimensional configuration space
+        eval_fitness takes a position in the n-dimensional configuration space
         and evaluates the function to be minimized at that point, returning
         a float.
         """
 
-        raise NotImplementedError("evalFitness() not implemented")
+        raise NotImplementedError("eval_fitness() not implemented")
 
     def boundaries(self):
         """
@@ -59,22 +59,25 @@ class Candidate(object):
 class Params(object):
     """Params is the object contains the parameters for a PSO solver."""
 
+    # pylint: disable=too-few-public-methods
+    # pylint: disable=too-many-instance-attributes
     def __init__(self, **kwargs):
-        self.c1 = kwargs.get('c1', 2.05)
-        self.c2 = kwargs.get('c2', 2.05)
-        self.w = kwargs.get('w', 0.9)
-        self.psoType = kwargs.get('psoType', 'Constriction')
-        self.topology = kwargs.get('topology', 'Global')
-        self.maxIterations = kwargs.get('maxIterations', 1000)
-        self.currentIteration = kwargs.get('currentIteration', 0)
-        self.extrema = kwargs.get('extrema', 'Min')
+        self.cognative_acceleration = kwargs.get('cognative_acceleration', 2.05)
+        self.social_acceleration = kwargs.get('social_acceleration', 2.05)
+        self.weighting_factor = kwargs.get('weighting_factor', 0.9)
+        self.pso_type = kwargs.get('pso_type', 'constriction')
+        self.topology = kwargs.get('topology', 'global')
+        self.max_iterations = kwargs.get('max_iterations', 1000)
+        self.current_iterations = kwargs.get('current_iterations', 0)
+        self.extrema = kwargs.get('extrema', 'min')
         self.verbose = kwargs.get('verbose', False)
 
 
 def solver(candidates, params=Params()):
-    s = Swarm(candidates, params)
-    s.runIterations()
-    return s.gBestFit, s.gBestPos
+    """The main solver for this module"""
+    swarm = Swarm(candidates, params)
+    swarm.run_iterations()
+    return swarm.gbest_fit, swarm.gbest_pos
 
 class Swarm(object):
     """
@@ -93,114 +96,135 @@ class Swarm(object):
     wide range of the various PSO algorithms with minimal work
     """
 
+    # pylint: disable=too-many-instance-attributes
     def __init__(self, candidates, params):
         self.candidates = candidates
         self.pos = []
-        self.bPos = []
-        self.v = []
+        self.best_pos = []
+        self.velocity = []
         self.fit = np.zeros(shape=(len(candidates)), dtype=np.float)
-        self.bFit = np.zeros(shape=(len(candidates)), dtype=np.float)
+        self.best_fit = np.zeros(shape=(len(candidates)), dtype=np.float)
         self.target = np.zeros(shape=(len(candidates)), dtype=np.int)
         self.params = params
-        self.gBestID = None
-        self.gBestFit = None
-        self.gBestPos = None
+        self.gbest_id = None
+        self.gbest_fit = None
+        self.gbest_pos = None
 
-        for i in range(len(self.candidates)):
-            lowerBounds, upperBounds = self.candidates[i].boundaries()
-            assert(len(lowerBounds) == len(upperBounds))
-            for j in range(len(lowerBounds)):
-                assert(upperBounds[j] > lowerBounds[j])
-            pos = np.random.rand(len(upperBounds))
-            pos = pos * (lowerBounds - upperBounds) + upperBounds
-            self.fit[i] = self.candidates[i].evalFitness(pos)
-            self.bFit[i] = self.fit[i]
+        for i, _ in enumerate(self.candidates):
+            lower_bounds, upper_bounds = self.candidates[i].boundaries()
+            assert len(lower_bounds) == len(upper_bounds)
+            assert np.all(np.greater(upper_bounds, lower_bounds))
+            pos = np.random.rand(len(upper_bounds))
+            pos = pos * (lower_bounds - upper_bounds) + upper_bounds
+            self.fit[i] = self.candidates[i].eval_fitness(pos)
+            self.best_fit[i] = self.fit[i]
             self.pos.append(pos)
-            self.bPos.append(pos)
-            self.v.append(np.zeros(len(upperBounds)))
+            self.best_pos.append(pos)
+            self.velocity.append(np.zeros(len(upper_bounds)))
 
-        self.findGBest()
+        self.find_gbest()
         return None
 
-    def findGBest(self):
-        self.gBestID = 0
-        self.gBestFit = self.bFit[0]
-        for i in range(len(self.candidates)):
-            if self.bFit[i] < self.gBestFit:
-                self.gBestFit = self.bFit[i]
-                self.gBestID = i
-        self.gBestPos = np.copy(self.bPos[self.gBestID])
+    def find_gbest(self):
+        """Find the global best candidate in this iteration."""
+        self.gbest_id = 0
+        self.gbest_fit = self.best_fit[0]
+        for i, _ in enumerate(self.candidates):
+            if self.best_fit[i] < self.gbest_fit:
+                self.gbest_fit = self.best_fit[i]
+                self.gbest_id = i
+        self.gbest_pos = np.copy(self.best_pos[self.gbest_id])
         return None
 
-    def runIterations(self):
-        while self.params.currentIteration < self.params.maxIterations:
+    def run_iterations(self):
+        """Run all iterations using the PSO method."""
+        while self.params.current_iterations < self.params.max_iterations:
             self.iterate()
-            self.params.currentIteration += 1
+            self.params.current_iterations += 1
         return None
 
     def iterate(self):
-        self.updateTargets()
-        self.updateVelocity()
-        self.updatePos()
-        self.checkBoundaries()
-        self.getFitness()
-        self.updatePersonalBests()
-        self.findGBest()
+        """Run a single PSO iteration."""
+        self.update_targets()
+        self.update_velocity()
+        self.update_position()
+        self.check_boundaries()
+        self.get_fitness()
+        self.update_personal_bests()
+        self.find_gbest()
         if self.params.verbose:
-            x1 = np.sum(self.fit) / len(self.fit)
-            x2 = np.sum(self.bFit) / len(self.bFit)
+            average_fitness = np.sum(self.fit) / len(self.fit)
+            average_best_fitness = np.sum(self.best_fit) / len(self.best_fit)
             print(self.fit)
-            print(self.bFit)
-            print("Finished with iteration", self.params.currentIteration)
-            print("Global best:", self.gBestID, "\tfitness:", self.gBestFit)
-            print("The average fitness in this iteration is", x1)
-            print("The average best fitness over all iterations is", x2)
+            print(self.best_fit)
+            print("Finished with iteration", self.params.current_iterations)
+            print("Global best:", self.gbest_id, "\tfitness:", self.gbest_fit)
+            print("The average fitness in this iteration is", average_fitness)
+            print("The average best fitness over all iterations is", average_best_fitness)
+        return None
 
-    def updateTargets(self):
-        if self.params.topology == "Global":
-            for i in range(len(self.target)):
-                self.target[i] = self.gBestID
+    def update_targets(self):
+        """Update the targets for all candidates"""
+        if self.params.topology == "global":
+            self.target[...] = self.gbest_id
         else:
-            print("Unknown topology:", self.params.topology)
-            raise
+            raise NotImplementedError("Unknown topology:", self.params.topology)
+        return None
 
-    def updateVelocity(self):
-        if self.params.psoType == "Constriction":
-            phi = self.params.c1 + self.params.c2
+    def update_velocity(self):
+        """Determine the velocity of the candidates based on their targets"""
+        if self.params.pso_type == "constriction":
+            phi = self.params.cognative_acceleration + self.params.social_acceleration
             chi = (2.0 / abs(2.0 - phi - math.sqrt((phi * phi) - (4.0 * phi))))
-            for i in range(len(self.candidates)):
-                for j in range(len(self.v[i])):
-                    t = self.target[i]
-                    self.v[i][j] = chi * (self.v[i][j] +
-                                          (random.random() * self.params.c1 *
-                                          (self.bPos[i][j] - self.pos[i][j])) +
-                                          (random.random() * self.params.c2 *
-                                          (self.bPos[t][j] - self.pos[i][j])))
+            for i, _ in enumerate(self.candidates):
+                my_target = self.target[i]
+                # .shape returns a tuple. so we need to unzip it with the *.
+                rand_set1 = np.random.rand(*self.velocity[i].shape)
+                rand_set2 = np.random.rand(*self.velocity[i].shape)
+                self.velocity[i] = chi * (self.velocity[i] +
+                                          (rand_set1 * self.params.cognative_acceleration *
+                                           (self.best_pos[i] - self.pos[i])) +
+                                          (rand_set2 * self.params.social_acceleration *
+                                           (self.best_pos[my_target] - self.pos[i])))
         else:
-            print("Unknown PSO type:", self.params.psoType)
-            raise
+            raise NotImplementedError("Unknown PSO type:", self.params.pso_type)
+        return None
 
-    def updatePos(self):
-        for i in range(len(self.candidates)):
-            self.pos[i] += self.v[i]
+    def update_position(self):
+        """Move the candidates based on their velocities"""
+        for i, _ in enumerate(self.candidates):
+            self.pos[i] += self.velocity[i]
+        return None
 
-    def checkBoundaries(self):
-        for i in range(len(self.candidates)):
+    def check_boundaries(self):
+        """Check if candidates left the search space, and bring them back."""
+        for i, _ in enumerate(self.candidates):
             lower, upper = self.candidates[i].boundaries()
-            for j in range(len(upper)):
+            for j, _ in enumerate(upper):
                 if self.pos[i][j] > upper[j]:
                     self.pos[i][j] = upper[j]
-                    self.v[i][j] = 0.0
+                    self.velocity[i][j] = 0.0
                 if self.pos[i][j] < lower[j]:
                     self.pos[i][j] = lower[j]
-                    self.v[i][j] = 0.0
+                    self.velocity[i][j] = 0.0
+        return None
 
-    def getFitness(self):
-        for i in range(len(self.candidates)):
-            self.fit[i] = self.candidates[i].evalFitness(self.pos[i])
+    def get_fitness(self):
+        """evaluate the fitness of the candidates in the current position."""
+        for i, _ in enumerate(self.candidates):
+            self.fit[i] = self.candidates[i].eval_fitness(self.pos[i])
+        return None
 
-    def updatePersonalBests(self):
-        for i in range(len(self.candidates)):
-            if self.fit[i] < self.bFit[i]:
-                self.bFit[i] = self.fit[i]
-                self.bPos[i] = np.copy(self.pos[i])
+    def update_personal_bests(self):
+        """Update the personal best fitness and position if better ones found"""
+
+        for i, _ in enumerate(self.candidates):
+            if self.params.extrema == 'min':
+                if self.fit[i] < self.best_fit[i]:
+                    self.best_fit[i] = self.fit[i]
+                    self.best_pos[i] = np.copy(self.pos[i])
+            elif self.params.extrema == 'max':
+                if self.fit[i] > self.best_fit[i]:
+                    self.best_fit[i] = self.fit[i]
+                    self.best_pos[i] = np.copy(self.pos[i])
+        return None
