@@ -1,10 +1,12 @@
+# To ignore pylint's "numpy does not contains * member" errors:
+# pylint: disable=E1101
+import unittest
 import numpy as np
 import pso
-import unittest
 
 
 class CandidateHelper(pso.Candidate):
-    def evalFitness(self, pos):
+    def eval_fitness(self, pos):
         return np.sum(np.power(pos, 2))
 
     def boundaries(self):
@@ -13,7 +15,7 @@ class CandidateHelper(pso.Candidate):
 class TestPSO(unittest.TestCase):
     def test_solver(self):
         c = []
-        for i in range(10):
+        for _ in range(10):
             c.append(CandidateHelper())
 
         fitness, position = pso.solver(c)
