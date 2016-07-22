@@ -23,6 +23,7 @@ candidates.
 # To ignore pylint's "numpy does not contains * member" errors:
 # pylint: disable=E1101
 import math
+import random
 import numpy as np
 
 
@@ -186,7 +187,7 @@ class Swarm(object):
 
         elif pso_type == "standard":
             self.inertial_weight = 0.5 * ((self.max_iterations - self.current_iteration) /
-                                          self.max_iterations) + 0.4
+                                          self.max_iterations) + 0.4 * random.random()
             for i, _ in enumerate(self.candidates):
                 my_target = self.target[i]
                 # .shape returns a tuple, so we need to unzip it with the *.
