@@ -86,6 +86,7 @@ class Swarm(object):
         self.topology = kwargs.get('topology', 'global')
         self.max_iterations = kwargs.get('max_iterations', 1000)
         self.current_iteration = kwargs.get('current_iteration', 0)
+        self.velocity_max = kwargs.get('velocity_max', 0.1)
         self.extrema = kwargs.get('extrema', 'min')
         self.verbose = kwargs.get('verbose', False)
 
@@ -174,7 +175,7 @@ class Swarm(object):
             chi = (2.0 / abs(2.0 - phi - math.sqrt((phi * phi) - (4.0 * phi))))
             for i, _ in enumerate(self.candidates):
                 my_target = self.target[i]
-                # .shape returns a tuple. so we need to unzip it with the *.
+                # .shape returns a tuple, so we need to unzip it with the *.
                 rand_set1 = np.random.rand(*self.velocity[i].shape)
                 rand_set2 = np.random.rand(*self.velocity[i].shape)
                 self.velocity[i] = chi * (self.velocity[i] +
@@ -188,7 +189,7 @@ class Swarm(object):
                                           self.max_iterations) + 0.4
             for i, _ in enumerate(self.candidates):
                 my_target = self.target[i]
-                # .shape returns a tuple. so we need to unzip it with the *.
+                # .shape returns a tuple, so we need to unzip it with the *.
                 rand_set1 = np.random.rand(*self.velocity[i].shape)
                 rand_set2 = np.random.rand(*self.velocity[i].shape)
                 self.velocity[i] = (self.inertial_weight * self.velocity[i] +
@@ -198,6 +199,12 @@ class Swarm(object):
                                      (self.best_pos[my_target] - self.pos[i])))
         else:
             raise NotImplementedError("Unknown PSO type:", self.pso_type)
+
+        for i, _ in enumerate(self.candidates):
+            for i, _ in enumerate(self.candidates):
+                self.velocity[i][self.velocity[i] > self.velocity_max] = self.velocity_max
+                self.velocity[i][self.velocity[i] < self.velocity_max] = -self.velocity_max
+
         return None
 
     def update_position(self):
