@@ -64,11 +64,11 @@ class Params(object):
     def __init__(self, **kwargs):
         self.cognative_acceleration = kwargs.get('cognative_acceleration', 2.05)
         self.social_acceleration = kwargs.get('social_acceleration', 2.05)
-        self.weighting_factor = kwargs.get('weighting_factor', 0.9)
+        self.inertial_weight = kwargs.get('inertial_weight', 0.9)
         self.pso_type = kwargs.get('pso_type', 'constriction')
         self.topology = kwargs.get('topology', 'global')
         self.max_iterations = kwargs.get('max_iterations', 1000)
-        self.current_iterations = kwargs.get('current_iterations', 0)
+        self.current_iteration = kwargs.get('current_iteration', 0)
         self.extrema = kwargs.get('extrema', 'min')
         self.verbose = kwargs.get('verbose', False)
 
@@ -138,9 +138,9 @@ class Swarm(object):
 
     def run_iterations(self):
         """Run all iterations using the PSO method."""
-        while self.params.current_iterations < self.params.max_iterations:
+        while self.params.current_iteration < self.params.max_iterations:
             self.iterate()
-            self.params.current_iterations += 1
+            self.params.current_iteration += 1
         return None
 
     def iterate(self):
@@ -157,7 +157,7 @@ class Swarm(object):
             average_best_fitness = np.sum(self.best_fit) / len(self.best_fit)
             print(self.fit)
             print(self.best_fit)
-            print("Finished with iteration", self.params.current_iterations)
+            print("Finished with iteration", self.params.current_iteration)
             print("Global best:", self.gbest_id, "\tfitness:", self.gbest_fit)
             print("The average fitness in this iteration is", average_fitness)
             print("The average best fitness over all iterations is", average_best_fitness)
@@ -165,15 +165,21 @@ class Swarm(object):
 
     def update_targets(self):
         """Update the targets for all candidates"""
-        if self.params.topology == "global":
-            self.target[...] = self.gbest_id
+        topology = self.params.topology
+        pso_type = self.params.pso_type
+        if topology == "global":
+            if pso_type == "standard" or pso_type == "constriction":
+                self.target[...] = self.gbest_id
+            else:
+                raise NotImplementedError("Unknown PSO type:", pso_type)
         else:
-            raise NotImplementedError("Unknown topology:", self.params.topology)
+            raise NotImplementedError("Unknown topology:", topology)
         return None
 
     def update_velocity(self):
         """Determine the velocity of the candidates based on their targets"""
-        if self.params.pso_type == "constriction":
+        pso_type = self.params.pso_type
+        if pso_type == "constriction":
             phi = self.params.cognative_acceleration + self.params.social_acceleration
             chi = (2.0 / abs(2.0 - phi - math.sqrt((phi * phi) - (4.0 * phi))))
             for i, _ in enumerate(self.candidates):
@@ -186,6 +192,20 @@ class Swarm(object):
                                            (self.best_pos[i] - self.pos[i])) +
                                           (rand_set2 * self.params.social_acceleration *
                                            (self.best_pos[my_target] - self.pos[i])))
+
+        elif pso_type == "standard":
+            self.params.inertial_weight = 0.5 * ((self.params.max_iterations - self.params.current_iteration) /
+                                                 self.params.max_iterations) + 0.4
+            for i, _ in enumerate(self.candidates):
+                my_target = self.target[i]
+                # .shape returns a tuple. so we need to unzip it with the *.
+                rand_set1 = np.random.rand(*self.velocity[i].shape)
+                rand_set2 = np.random.rand(*self.velocity[i].shape)
+                self.velocity[i] = (self.params.inertial_weight * self.velocity[i] +
+                                    (rand_set1 * self.params.cognative_acceleration *
+                                     (self.best_pos[i] - self.pos[i])) +
+                                    (rand_set2 * self.params.social_acceleration *
+                                     (self.best_pos[my_target] - self.pos[i])))
         else:
             raise NotImplementedError("Unknown PSO type:", self.params.pso_type)
         return None
