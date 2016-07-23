@@ -94,12 +94,13 @@ class Swarm(object):
         self.velocity_max = kwargs.get('velocity_max', 0.1)
         self.extrema = kwargs.get('extrema', 'min')
         self.num_candidates = kwargs.get('num_candidates', 20)
+        assert (self.num_candidates % 10 == 0), "Number of candidates must be divisble by 10"
         self.verbose = kwargs.get('verbose', False)
 
         self.candidate = candidate
         lower_bounds, upper_bounds = self.candidate.boundaries()
-        assert len(lower_bounds) == len(upper_bounds)
-        assert np.all(np.greater(upper_bounds, lower_bounds))
+        assert len(lower_bounds) == len(upper_bounds), "Length of upper and lower bounds must match"
+        assert np.all(np.greater(upper_bounds, lower_bounds)), "Upper bounds less than lower bounds"
         self.num_dims = len(upper_bounds)
 
         self.fit = np.zeros(shape=(self.num_candidates), dtype=np.float)
@@ -122,11 +123,19 @@ class Swarm(object):
         """Find the global best candidate in this iteration."""
         self.gbest_id = 0
         self.gbest_fit = self.best_fit[0]
-        for i in range(self.num_candidates):
-            if self.best_fit[i] < self.gbest_fit:
-                self.gbest_fit = self.best_fit[i]
-                self.gbest_id = i
-        self.gbest_pos = np.copy(self.best_pos[self.gbest_id])
+        if self.extrema == "min":
+            for i in range(self.num_candidates):
+                if self.best_fit[i] < self.gbest_fit:
+                    self.gbest_fit = self.best_fit[i]
+                    self.gbest_id = i
+            self.gbest_pos = np.copy(self.best_pos[self.gbest_id])
+        elif self.extrema == "max":
+            for i in range(self.num_candidates):
+                if self.best_fit[i] > self.gbest_fit:
+                    self.gbest_fit = self.best_fit[i]
+                    self.gbest_id = i
+            self.gbest_pos = np.copy(self.best_pos[self.gbest_id])
+
         return None
 
     def run_iterations(self):
@@ -159,38 +168,89 @@ class Swarm(object):
     def update_targets(self):
         """Update the targets for all candidates"""
         topology = self.topology
-        pso_type = self.pso_type
         if topology == "global":
-            if pso_type == "standard" or pso_type == "constriction":
-                self.target[...] = self.gbest_id
-            else:
-                raise NotImplementedError("Unknown PSO type:", pso_type)
+            self.update_targets_global()
         elif topology == "random":
-            for i in range(self.num_candidates):
-                target = None
-                # randomly pick a target that is not the candidate itself.
-                while True:
-                    target = random.randint(0, self.num_candidates-1)
-                    if target != i:
-                        break
-
-                # we want to accelerate toward the target if it is better, and
-                # away from it if it worse. In order to denote a worse candidate,
-                # we set the target's index to negative so that we know later
-                # to accelerate away.
-                if self.extrema == "min":
-                    if self.fit[i] > self.fit[target]:
-                        self.target[i] = target
-                    else:
-                        self.target[i] = -target
-                elif self.extrema == "max":
-                    if self.fit[i] < self.fit[target]:
-                        self.target[i] = target
-                    else:
-                        self.target[i] = -target
+            self.update_targets_random()
+        elif topology == "von neumann":
+            self.update_targets_von_neumann()
         else:
             raise NotImplementedError("Unknown topology:", topology)
         return None
+
+    def update_targets_global(self):
+        """The specific target update for the global topology"""
+        pso_type = self.pso_type
+        if pso_type == "standard" or pso_type == "constriction":
+            self.target[...] = self.gbest_id
+        else:
+            raise NotImplementedError('Global topology not implemented for pso type:', pso_type)
+        return None
+
+    def update_targets_random(self):
+        """The specific target update for the random topology"""
+        for i in range(self.num_candidates):
+            # randomly pick a target that is not the candidate itself.
+            while True:
+                target = random.randint(0, self.num_candidates-1)
+                if target != i:
+                    break
+
+            # we want to accelerate toward the target if it is better, and
+            # away from it if it worse. In order to denote a worse candidate,
+            # we set the target's index to negative so that we know later
+            # to accelerate away.
+            if self.extrema == "min":
+                if self.fit[i] > self.fit[target]:
+                    self.target[i] = target
+                else:
+                    self.target[i] = -target
+            elif self.extrema == "max":
+                if self.fit[i] < self.fit[target]:
+                    self.target[i] = target
+                else:
+                    self.target[i] = -target
+        return None
+
+    def update_targets_von_neumann(self):
+        """The specific target update for the von neumann topology"""
+        neighbor = np.zeros(shape=(4), dtype=int)
+        row_length = int(self.num_candidates/10)  # int casting in case of python 2 use.
+        for i in range(self.num_candidates):
+            if i - row_length < 0:  # at the top of grid
+                neighbor[0] = self.num_candidates - row_length + 1
+            else:
+                neighbor[0] = i - row_length
+            if (i+1)%row_length == 0:  # at the right
+                neighbor[1] = i - (row_length - 1)
+            else:
+                neighbor[1] = i + 1
+            if (i+row_length) >= self.num_candidates:  # at bottom of grid
+                neighbor[2] = i - self.num_candidates + row_length
+            else:
+                neighbor[2] = i + row_length
+            if i%row_length == 0:
+                neighbor[3] = i + row_length - 1
+            else:
+                neighbor[3] = i -1
+
+            pso_type = self.pso_type
+            if pso_type == "standard" or pso_type == "constriction":
+                self.target[i] = neighbor[0]
+                neighbor_fitness = self.best_fit[neighbor[0]]
+                for i in range(1, 4):
+                    if self.extrema == 'min':
+                        if self.best_fit[neighbor[i]] < neighbor_fitness:
+                            self.target[i] = neighbor[i]
+                            neighbor_fitness = self.best_fit[neighbor[i]]
+                    elif self.extrema == 'max':
+                        if self.best_fit[neighbor[i]] > neighbor_fitness:
+                            self.target[i] = neighbor[i]
+                            neighbor_fitness = self.best_fit[neighbor[i]]
+            else:
+                raise NotImplementedError('von neumann topology for pso type:', pso_type)
+        return None
+
 
     def update_velocity(self):
         """Determine the velocity of the candidates based on their targets"""
