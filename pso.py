@@ -165,6 +165,29 @@ class Swarm(object):
                 self.target[...] = self.gbest_id
             else:
                 raise NotImplementedError("Unknown PSO type:", pso_type)
+        elif topology == "random":
+            for i in range(self.num_candidates):
+                target = None
+                # randomly pick a target that is not the candidate itself.
+                while True:
+                    target = random.randint(0, self.num_candidates-1)
+                    if target != i:
+                        break
+
+                # we want to accelerate toward the target if it is better, and
+                # away from it if it worse. In order to denote a worse candidate,
+                # we set the target's index to negative so that we know later
+                # to accelerate away.
+                if self.extrema == "min":
+                    if self.fit[i] > self.fit[target]:
+                        self.target[i] = target
+                    else:
+                        self.target[i] = -target
+                elif self.extrema == "max":
+                    if self.fit[i] < self.fit[target]:
+                        self.target[i] = target
+                    else:
+                        self.target[i] = -target
         else:
             raise NotImplementedError("Unknown topology:", topology)
         return None
@@ -177,6 +200,14 @@ class Swarm(object):
             chi = (2.0 / abs(2.0 - phi - math.sqrt((phi * phi) - (4.0 * phi))))
             for i in range(self.num_candidates):
                 my_target = self.target[i]
+                # if target is negative, that means that the target has worse
+                # fitness than the candidate. So we will accelerate away from
+                # it.
+                if my_target < 0:
+                    direction = -1.0
+                    my_target = -my_target
+                else:
+                    direction = 1.0
                 # .shape returns a tuple, so we need to unzip it with the *.
                 rand_set1 = np.random.rand(*self.velocity[i].shape)
                 rand_set2 = np.random.rand(*self.velocity[i].shape)
@@ -184,13 +215,21 @@ class Swarm(object):
                                           (rand_set1 * self.cognative_acceleration *
                                            (self.best_pos[i] - self.pos[i])) +
                                           (rand_set2 * self.social_acceleration *
-                                           (self.best_pos[my_target] - self.pos[i])))
+                                           (self.best_pos[my_target] - direction * self.pos[i])))
 
         elif pso_type == "standard":
             self.inertial_weight = 0.5 * ((self.max_iterations - self.current_iteration) /
                                           self.max_iterations) + 0.4 * random.random()
             for i in range(self.num_candidates):
                 my_target = self.target[i]
+                # if target is negative, that means that the target has worse
+                # fitness than the candidate. So we will accelerate away from
+                # it.
+                if my_target < 0:
+                    direction = -1.0
+                    my_target = -my_target
+                else:
+                    direction = 1.0
                 # .shape returns a tuple, so we need to unzip it with the *.
                 rand_set1 = np.random.rand(*self.velocity[i].shape)
                 rand_set2 = np.random.rand(*self.velocity[i].shape)
@@ -198,7 +237,7 @@ class Swarm(object):
                                     (rand_set1 * self.cognative_acceleration *
                                      (self.best_pos[i] - self.pos[i])) +
                                     (rand_set2 * self.social_acceleration *
-                                     (self.best_pos[my_target] - self.pos[i])))
+                                     (self.best_pos[my_target] - direction * self.pos[i])))
         else:
             raise NotImplementedError("Unknown PSO type:", self.pso_type)
 
