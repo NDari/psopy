@@ -55,9 +55,9 @@ class Candidate(object):
         raise NotImplementedError("boundaries() not implemented")
 
 
-def solver(candidates, **kwargs):
+def solver(candidate, **kwargs):
     """The main solver for this module"""
-    swarm = Swarm(candidates, **kwargs)
+    swarm = Swarm(candidate, **kwargs)
     swarm.run_iterations()
     return swarm.gbest_fit, swarm.gbest_pos
 
@@ -79,7 +79,7 @@ class Swarm(object):
     """
 
     # pylint: disable=too-many-instance-attributes
-    def __init__(self, candidates, **kwargs):
+    def __init__(self, candidate, **kwargs):
         self.cognative_acceleration = kwargs.get('cognative_acceleration', 2.05)
         self.social_acceleration = kwargs.get('social_acceleration', 2.05)
         self.inertial_weight = kwargs.get('inertial_weight', 0.9)
@@ -89,26 +89,27 @@ class Swarm(object):
         self.current_iteration = kwargs.get('current_iteration', 0)
         self.velocity_max = kwargs.get('velocity_max', 0.1)
         self.extrema = kwargs.get('extrema', 'min')
+        self.num_candidates = kwargs.get('num_candidates', 20)
         self.verbose = kwargs.get('verbose', False)
 
-        self.candidates = candidates
+        self.candidate = candidate
         self.pos = []
         self.best_pos = []
         self.velocity = []
-        self.fit = np.zeros(shape=(len(candidates)), dtype=np.float)
-        self.best_fit = np.zeros(shape=(len(candidates)), dtype=np.float)
-        self.target = np.zeros(shape=(len(candidates)), dtype=np.int)
+        self.fit = np.zeros(shape=(self.num_candidates), dtype=np.float)
+        self.best_fit = np.zeros(shape=(self.num_candidates), dtype=np.float)
+        self.target = np.zeros(shape=(self.num_candidates), dtype=np.int)
         self.gbest_id = None
         self.gbest_fit = None
         self.gbest_pos = None
 
-        for i, _ in enumerate(self.candidates):
-            lower_bounds, upper_bounds = self.candidates[i].boundaries()
+        for i in range(self.num_candidates):
+            lower_bounds, upper_bounds = self.candidate.boundaries()
             assert len(lower_bounds) == len(upper_bounds)
             assert np.all(np.greater(upper_bounds, lower_bounds))
             pos = np.random.rand(len(upper_bounds))
             pos = pos * (lower_bounds - upper_bounds) + upper_bounds
-            self.fit[i] = self.candidates[i].eval_fitness(pos)
+            self.fit[i] = self.candidate.eval_fitness(pos)
             self.best_fit[i] = self.fit[i]
             self.pos.append(pos)
             self.best_pos.append(pos)
@@ -121,7 +122,7 @@ class Swarm(object):
         """Find the global best candidate in this iteration."""
         self.gbest_id = 0
         self.gbest_fit = self.best_fit[0]
-        for i, _ in enumerate(self.candidates):
+        for i in range(self.num_candidates):
             if self.best_fit[i] < self.gbest_fit:
                 self.gbest_fit = self.best_fit[i]
                 self.gbest_id = i
@@ -174,7 +175,7 @@ class Swarm(object):
         if pso_type == "constriction":
             phi = self.cognative_acceleration + self.social_acceleration
             chi = (2.0 / abs(2.0 - phi - math.sqrt((phi * phi) - (4.0 * phi))))
-            for i, _ in enumerate(self.candidates):
+            for i in range(self.num_candidates):
                 my_target = self.target[i]
                 # .shape returns a tuple, so we need to unzip it with the *.
                 rand_set1 = np.random.rand(*self.velocity[i].shape)
@@ -188,7 +189,7 @@ class Swarm(object):
         elif pso_type == "standard":
             self.inertial_weight = 0.5 * ((self.max_iterations - self.current_iteration) /
                                           self.max_iterations) + 0.4 * random.random()
-            for i, _ in enumerate(self.candidates):
+            for i in range(self.num_candidates):
                 my_target = self.target[i]
                 # .shape returns a tuple, so we need to unzip it with the *.
                 rand_set1 = np.random.rand(*self.velocity[i].shape)
@@ -201,8 +202,8 @@ class Swarm(object):
         else:
             raise NotImplementedError("Unknown PSO type:", self.pso_type)
 
-        for i, _ in enumerate(self.candidates):
-            for i, _ in enumerate(self.candidates):
+        for i in range(self.num_candidates):
+            for i in range(self.num_candidates):
                 self.velocity[i][self.velocity[i] > self.velocity_max] = self.velocity_max
                 self.velocity[i][self.velocity[i] < self.velocity_max] = -self.velocity_max
 
@@ -210,14 +211,14 @@ class Swarm(object):
 
     def update_position(self):
         """Move the candidates based on their velocities"""
-        for i, _ in enumerate(self.candidates):
+        for i in range(self.num_candidates):
             self.pos[i] += self.velocity[i]
         return None
 
     def check_boundaries(self):
         """Check if candidates left the search space, and bring them back."""
-        for i, _ in enumerate(self.candidates):
-            lower, upper = self.candidates[i].boundaries()
+        for i in range(self.num_candidates):
+            lower, upper = self.candidate.boundaries()
             for j, _ in enumerate(upper):
                 if self.pos[i][j] > upper[j]:
                     self.pos[i][j] = upper[j]
@@ -229,14 +230,14 @@ class Swarm(object):
 
     def get_fitness(self):
         """evaluate the fitness of the candidates in the current position."""
-        for i, _ in enumerate(self.candidates):
-            self.fit[i] = self.candidates[i].eval_fitness(self.pos[i])
+        for i in range(self.num_candidates):
+            self.fit[i] = self.candidate.eval_fitness(self.pos[i])
         return None
 
     def update_personal_bests(self):
         """Update the personal best fitness and position if better ones found"""
 
-        for i, _ in enumerate(self.candidates):
+        for i in range(self.num_candidates):
             if self.extrema == 'min':
                 if self.fit[i] < self.best_fit[i]:
                     self.best_fit[i] = self.fit[i]
