@@ -38,9 +38,13 @@ class Candidate(object):
 
     def eval_fitness(self, pos):
         """
-        eval_fitness takes a position in the n-dimensional configuration space
-        and evaluates the function to be minimized at that point, returning
-        a float.
+        eval_fitness takes a set of positions in the n-dimensional configuration
+        space and evaluates the function to be optimized at that easch point,
+        returning a numpy float array. Each position in the set represents
+        the location of a candidate in the configuration space. Therefore, the
+        length of the returned numpy array must match the number of candidates
+        whole positions were passed to this function. The default num_candidates
+        is set to 20.
         """
         raise NotImplementedError("eval_fitness() not implemented")
 
@@ -93,9 +97,11 @@ class Swarm(object):
         self.verbose = kwargs.get('verbose', False)
 
         self.candidate = candidate
-        self.pos = []
-        self.best_pos = []
-        self.velocity = []
+        lower_bounds, upper_bounds = self.candidate.boundaries()
+        assert len(lower_bounds) == len(upper_bounds)
+        assert np.all(np.greater(upper_bounds, lower_bounds))
+        self.num_dims = len(upper_bounds)
+
         self.fit = np.zeros(shape=(self.num_candidates), dtype=np.float)
         self.best_fit = np.zeros(shape=(self.num_candidates), dtype=np.float)
         self.target = np.zeros(shape=(self.num_candidates), dtype=np.int)
@@ -103,18 +109,12 @@ class Swarm(object):
         self.gbest_fit = None
         self.gbest_pos = None
 
-        for i in range(self.num_candidates):
-            lower_bounds, upper_bounds = self.candidate.boundaries()
-            assert len(lower_bounds) == len(upper_bounds)
-            assert np.all(np.greater(upper_bounds, lower_bounds))
-            pos = np.random.rand(len(upper_bounds))
-            pos = pos * (lower_bounds - upper_bounds) + upper_bounds
-            self.fit[i] = self.candidate.eval_fitness(pos)
-            self.best_fit[i] = self.fit[i]
-            self.pos.append(pos)
-            self.best_pos.append(pos)
-            self.velocity.append(np.zeros(len(upper_bounds)))
-
+        self.pos = np.random.rand(self.num_candidates, self.num_dims)
+        self.pos = self.pos * (lower_bounds - upper_bounds) + upper_bounds
+        self.fit = self.candidate.eval_fitness(self.pos)
+        self.best_pos = np.copy(self.pos)
+        self.best_fit = np.copy(self.fit)
+        self.velocity = np.zeros(shape=(self.num_candidates, self.num_dims), dtype=float)
         self.find_gbest()
         return None
 
@@ -218,20 +218,19 @@ class Swarm(object):
     def check_boundaries(self):
         """Check if candidates left the search space, and bring them back."""
         for i in range(self.num_candidates):
-            lower, upper = self.candidate.boundaries()
-            for j, _ in enumerate(upper):
-                if self.pos[i][j] > upper[j]:
-                    self.pos[i][j] = upper[j]
+            lower_bounds, upper_bounds = self.candidate.boundaries()
+            for j, _ in enumerate(upper_bounds):
+                if self.pos[i][j] > upper_bounds[j]:
+                    self.pos[i][j] = upper_bounds[j]
                     self.velocity[i][j] = 0.0
-                if self.pos[i][j] < lower[j]:
-                    self.pos[i][j] = lower[j]
+                if self.pos[i][j] < lower_bounds[j]:
+                    self.pos[i][j] = lower_bounds[j]
                     self.velocity[i][j] = 0.0
         return None
 
     def get_fitness(self):
         """evaluate the fitness of the candidates in the current position."""
-        for i in range(self.num_candidates):
-            self.fit[i] = self.candidate.eval_fitness(self.pos[i])
+        self.fit = self.candidate.eval_fitness(self.pos)
         return None
 
     def update_personal_bests(self):
