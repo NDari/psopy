@@ -2,7 +2,8 @@
 # pylint: disable=E1101
 import unittest
 import numpy as np
-import pso
+#from psopy import Candidate, solver
+import psopy.pso as pso
 
 
 class CandidateHelper(pso.Candidate):
