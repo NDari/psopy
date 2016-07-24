@@ -183,6 +183,29 @@ class Swarm(object):
         pso_type = self.pso_type
         if pso_type == "standard" or pso_type == "constriction":
             self.target[...] = self.gbest_id
+        elif pso_type == "fdr" or pso_type == "fdrs":
+            for i in range(self.num_candidates):
+                fdr, next_fdr = 0.0, 0.0
+                if i == 0:
+                    self.target[i] = 0
+                    fdr = 1000000000000000000.0
+                else:
+                    self.target[i] = 0
+                    fdr = self.best_fit[0] - self.best_fit[i]
+                    fdr /= np.sum(np.power((self.best_pos[0] - self.best_pos[i]), 2))
+                for j in range(1, self.num_candidates):
+                    if i == j:
+                        continue
+                    next_fdr = self.best_fit[j] - self.best_fit[i]
+                    next_fdr /= np.sum(np.power((self.best_pos[j] - self.best_pos[i]), 2))
+                    if self.extrema == 'min':
+                        if fdr > next_fdr:
+                            fdr = next_fdr
+                            self.target[i] = j
+                    elif self.extrema == 'max':
+                        if fdr < next_fdr:
+                            fdr = next_fdr
+                            self.target[i] = j
         else:
             raise NotImplementedError('Global topology not implemented for pso type:', pso_type)
         return None
@@ -214,26 +237,9 @@ class Swarm(object):
 
     def update_targets_von_neumann(self):
         """The specific target update for the von neumann topology"""
-        neighbor = np.zeros(shape=(4), dtype=int)
-        row_length = int(self.num_candidates/10)  # int casting in case of python 2 use.
-        for i in range(self.num_candidates):
-            if i - row_length < 0:  # at the top of grid
-                neighbor[0] = self.num_candidates - row_length + 1
-            else:
-                neighbor[0] = i - row_length
-            if (i+1)%row_length == 0:  # at the right
-                neighbor[1] = i - (row_length - 1)
-            else:
-                neighbor[1] = i + 1
-            if (i+row_length) >= self.num_candidates:  # at bottom of grid
-                neighbor[2] = i - self.num_candidates + row_length
-            else:
-                neighbor[2] = i + row_length
-            if i%row_length == 0:
-                neighbor[3] = i + row_length - 1
-            else:
-                neighbor[3] = i -1
 
+        for i in range(self.num_candidates):
+            neighbor = self.get_von_neumann_neighbors(i)
             pso_type = self.pso_type
             if pso_type == "standard" or pso_type == "constriction":
                 self.target[i] = neighbor[0]
@@ -247,15 +253,57 @@ class Swarm(object):
                         if self.best_fit[neighbor[i]] > neighbor_fitness:
                             self.target[i] = neighbor[i]
                             neighbor_fitness = self.best_fit[neighbor[i]]
+            elif pso_type == "fdr" or pso_type == "fdrs":
+                fdr, next_fdr = 0.0, 0.0
+                if i == 0:
+                    self.target[i] = neighbor[0]
+                    fdr = 1000000000000000000.0
+                else:
+                    self.target[i] = neighbor[0]
+                    fdr = self.best_fit[neighbor[0]] - self.best_fit[i]
+                    fdr /= np.sum(np.power((self.best_pos[neighbor[0]] - self.best_pos[i]), 2))
+                for j in range(1, 4):
+                    next_fdr = self.best_fit[neighbor[j]] - self.best_fit[i]
+                    next_fdr /= np.sum(np.power((self.best_pos[neighbor[j]] - self.best_pos[i]), 2))
+                    if self.extrema == 'min':
+                        if fdr > next_fdr:
+                            fdr = next_fdr
+                            self.target[i] = neighbor[j]
+                    elif self.extrema == 'max':
+                        if fdr < next_fdr:
+                            fdr = next_fdr
+                            self.target[i] = j
             else:
                 raise NotImplementedError('von neumann topology for pso type:', pso_type)
         return None
+
+    def get_von_neumann_neighbors(self, candidate_number):
+        """This method gets the von neumann neighbors of a given candidate in the swarm"""
+        neighbor = np.zeros(shape=(4), dtype=int)
+        row_length = int(self.num_candidates/10)  # int casting in case of python 2 use.
+        if candidate_number - row_length < 0:  # at the top of grid
+            neighbor[0] = self.num_candidates - row_length + 1
+        else:
+            neighbor[0] = candidate_number - row_length
+        if (candidate_number+1)%row_length == 0:  # at the right
+            neighbor[1] = candidate_number - (row_length - 1)
+        else:
+            neighbor[1] = candidate_number + 1
+        if (candidate_number+row_length) >= self.num_candidates:  # at bottom of grid
+            neighbor[2] = candidate_number - self.num_candidates + row_length
+        else:
+            neighbor[2] = candidate_number + row_length
+        if candidate_number%row_length == 0:
+            neighbor[3] = candidate_number + row_length - 1
+        else:
+            neighbor[3] = candidate_number -1
+        return neighbor
 
 
     def update_velocity(self):
         """Determine the velocity of the candidates based on their targets"""
         pso_type = self.pso_type
-        if pso_type == "constriction":
+        if pso_type == "constriction" or pso_type == "fdr":
             phi = self.cognative_acceleration + self.social_acceleration
             chi = (2.0 / abs(2.0 - phi - math.sqrt((phi * phi) - (4.0 * phi))))
             for i in range(self.num_candidates):
@@ -277,7 +325,7 @@ class Swarm(object):
                                           (rand_set2 * self.social_acceleration *
                                            (self.best_pos[my_target] - direction * self.pos[i])))
 
-        elif pso_type == "standard":
+        elif pso_type == "standard" or pso_type == "fdrs":
             self.inertial_weight = 0.5 * ((self.max_iterations - self.current_iteration) /
                                           self.max_iterations) + 0.4 * random.random()
             for i in range(self.num_candidates):
