@@ -111,7 +111,8 @@ class Swarm(object):
         self.gbest_pos = None
 
         self.pos = np.random.rand(self.num_candidates, self.num_dims)
-        self.pos = self.pos * (lower_bounds - upper_bounds) + upper_bounds
+        for i, _ in enumerate(self.pos):
+          self.pos[i] = self.pos[i] * (lower_bounds - upper_bounds) + upper_bounds
         self.fit = self.candidate.eval_fitness(self.pos)
         self.best_pos = np.copy(self.pos)
         self.best_fit = np.copy(self.fit)
