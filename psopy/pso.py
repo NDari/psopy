@@ -1,11 +1,11 @@
 """
 pso is an implementation of the Particle Swarm Optimization (PSO) method.
 
-The goal of the pso method is to take a set of such candidates, and through its
+The goal of the PSO method is to take a set of such candidates, and through its
 algorithm, search a certain space for a better solution. Consider the function
 x^2 (x squared). The minimum of this one dimensional function is at 0.0, as no
 other value can be given to the function to produce a lower result. The PSO
-method attempts to systematically and without any additional input find th
+method attempts to systematically and without any additional input find the
 solution.
 
 In order to do this, we start by defining the function which we wish to
@@ -29,7 +29,7 @@ import numpy as np
 
 class Candidate(object):
     """
-    Canidate is a potential extrema in a n-dimentional space.
+    Candidate is a potential extrema in a n-dimentional space.
 
     In order to optimize a function using this module, the user must provide
     an implementation of the Candidate class that has the methods eval_fitness()
@@ -39,21 +39,20 @@ class Candidate(object):
     def eval_fitness(self, pos):
         """
         eval_fitness takes a set of positions in the n-dimensional configuration
-        space and evaluates the function to be optimized at that easch point,
-        returning a numpy float array. Each position in the set represents
+        space and evaluates the function to be optimized at easch point,
+        returning a 1D numpy float array. Each position in the set represents
         the location of a candidate in the configuration space. Therefore, the
         length of the returned numpy array must match the number of candidates
-        whole positions were passed to this function. The default num_candidates
-        is set to 20.
+        whole positions were passed to this function.
         """
         raise NotImplementedError("eval_fitness() not implemented")
 
     def boundaries(self):
         """
-        boundaries returns two numpy arrays, for the lower and upper bounds of
-        the configuration space in each dimension.
+        boundaries returns two 1D numpy arrays, for the lower and upper bounds
+        of the configuration space in each dimension.
 
-        These boundaries map the regien of space in which the extrema of the
+        These boundaries map the region of space in which the extrema of the
         function to be found.
         """
         raise NotImplementedError("boundaries() not implemented")
@@ -112,7 +111,7 @@ class Swarm(object):
 
         self.pos = np.random.rand(self.num_candidates, self.num_dims)
         for i, _ in enumerate(self.pos):
-          self.pos[i] = self.pos[i] * (lower_bounds - upper_bounds) + upper_bounds
+            self.pos[i] = self.pos[i] * (lower_bounds - upper_bounds) + upper_bounds
         self.fit = self.candidate.eval_fitness(self.pos)
         self.best_pos = np.copy(self.pos)
         self.best_fit = np.copy(self.fit)
