@@ -10,7 +10,7 @@ if sys.version_info[0] < 3:
 setup(
     name='psopy',
     description='A Particle Swarm Optimizer',
-    version='0.1.2',
+    version='0.1.3',
     url='https://github.com/NDari/psopy',
     author='Naseer Dari',
     author_email='naseerdari01@gmail.com',

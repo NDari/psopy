@@ -24,10 +24,11 @@ candidates.
 # pylint: disable=E1101
 import math
 import random
+from abc import ABCMeta, abstractmethod
 import numpy as np
 
 
-class Candidate(object):
+class Candidate(metaclass=ABCMeta):
     """
     Candidate is a potential extrema in a n-dimentional space.
 
@@ -36,6 +37,7 @@ class Candidate(object):
     and boundaries().
     """
 
+    @abstractmethod
     def eval_fitness(self, pos):
         """
         eval_fitness takes a set of positions in the n-dimensional configuration
@@ -45,8 +47,9 @@ class Candidate(object):
         length of the returned numpy array must match the number of candidates
         whole positions were passed to this function.
         """
-        raise NotImplementedError("eval_fitness() not implemented")
+        pass
 
+    @abstractmethod
     def boundaries(self):
         """
         boundaries returns two 1D numpy arrays, for the lower and upper bounds
@@ -55,8 +58,7 @@ class Candidate(object):
         These boundaries map the region of space in which the extrema of the
         function to be found.
         """
-        raise NotImplementedError("boundaries() not implemented")
-
+        pass
 
 def solver(candidate, **kwargs):
     """The main solver for this module"""
