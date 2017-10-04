@@ -78,5 +78,6 @@ class TestPSO(unittest.TestCase):
         self.assertEqual(round(fitness), 0.0, "Found fitness is not 0.0")
         self.assertEqual(round(position[0]), 0.0, "Position[0] not at 0")
         self.assertEqual(round(position[1]), 0.0, "Position[1] not at 0")
+
 if __name__ == "__main__":
     unittest.main()

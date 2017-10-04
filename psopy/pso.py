@@ -27,38 +27,6 @@ import random
 import numpy as np
 
 
-class Candidate(object):
-    """
-    Canidate is a potential extrema in a n-dimentional space.
-
-    In order to optimize a function using this module, the user must provide
-    an implementation of the Candidate class that has the methods eval_fitness()
-    and boundaries().
-    """
-
-    def eval_fitness(self, pos):
-        """
-        eval_fitness takes a set of positions in the n-dimensional configuration
-        space and evaluates the function to be optimized at that easch point,
-        returning a numpy float array. Each position in the set represents
-        the location of a candidate in the configuration space. Therefore, the
-        length of the returned numpy array must match the number of candidates
-        whole positions were passed to this function. The default num_candidates
-        is set to 20.
-        """
-        raise NotImplementedError("eval_fitness() not implemented")
-
-    def boundaries(self):
-        """
-        boundaries returns two numpy arrays, for the lower and upper bounds of
-        the configuration space in each dimension.
-
-        These boundaries map the regien of space in which the extrema of the
-        function to be found.
-        """
-        raise NotImplementedError("boundaries() not implemented")
-
-
 def solver(candidate, **kwargs):
     """The main solver for this module"""
     swarm = Swarm(candidate, **kwargs)
@@ -84,15 +52,8 @@ class Swarm(object):
 
     # pylint: disable=too-many-instance-attributes
     def __init__(self, candidate, **kwargs):
-        self.cognative_acceleration = kwargs.get('cognative_acceleration', 2.05)
-        self.social_acceleration = kwargs.get('social_acceleration', 2.05)
-        self.inertial_weight = kwargs.get('inertial_weight', 0.9)
-        self.pso_type = kwargs.get('pso_type', 'constriction')
-        self.topology = kwargs.get('topology', 'global')
         self.max_iterations = kwargs.get('max_iterations', 1000)
         self.current_iteration = kwargs.get('current_iteration', 0)
-        self.velocity_max = kwargs.get('velocity_max', 0.1)
-        self.extrema = kwargs.get('extrema', 'min')
         self.num_candidates = kwargs.get('num_candidates', 20)
         assert (self.num_candidates % 10 == 0), "Number of candidates must be divisble by 10"
         self.verbose = kwargs.get('verbose', False)
@@ -300,67 +261,6 @@ class Swarm(object):
         return neighbor
 
 
-    def update_velocity(self):
-        """Determine the velocity of the candidates based on their targets"""
-        pso_type = self.pso_type
-        if pso_type == "constriction" or pso_type == "fdr":
-            phi = self.cognative_acceleration + self.social_acceleration
-            chi = (2.0 / abs(2.0 - phi - math.sqrt((phi * phi) - (4.0 * phi))))
-            for i in range(self.num_candidates):
-                my_target = self.target[i]
-                # if target is negative, that means that the target has worse
-                # fitness than the candidate. So we will accelerate away from
-                # it.
-                if my_target < 0:
-                    direction = -1.0
-                    my_target = -my_target
-                else:
-                    direction = 1.0
-                # .shape returns a tuple, so we need to unzip it with the *.
-                rand_set1 = np.random.rand(*self.velocity[i].shape)
-                rand_set2 = np.random.rand(*self.velocity[i].shape)
-                self.velocity[i] = chi * (self.velocity[i] +
-                                          (rand_set1 * self.cognative_acceleration *
-                                           (self.best_pos[i] - self.pos[i])) +
-                                          (rand_set2 * self.social_acceleration *
-                                           (self.best_pos[my_target] - direction * self.pos[i])))
-
-        elif pso_type == "standard" or pso_type == "fdrs":
-            self.inertial_weight = 0.5 * ((self.max_iterations - self.current_iteration) /
-                                          self.max_iterations) + 0.4 * random.random()
-            for i in range(self.num_candidates):
-                my_target = self.target[i]
-                # if target is negative, that means that the target has worse
-                # fitness than the candidate. So we will accelerate away from
-                # it.
-                if my_target < 0:
-                    direction = -1.0
-                    my_target = -my_target
-                else:
-                    direction = 1.0
-                # .shape returns a tuple, so we need to unzip it with the *.
-                rand_set1 = np.random.rand(*self.velocity[i].shape)
-                rand_set2 = np.random.rand(*self.velocity[i].shape)
-                self.velocity[i] = (self.inertial_weight * self.velocity[i] +
-                                    (rand_set1 * self.cognative_acceleration *
-                                     (self.best_pos[i] - self.pos[i])) +
-                                    (rand_set2 * self.social_acceleration *
-                                     (self.best_pos[my_target] - direction * self.pos[i])))
-        else:
-            raise NotImplementedError("Unknown PSO type:", self.pso_type)
-
-        for i in range(self.num_candidates):
-            for i in range(self.num_candidates):
-                self.velocity[i][self.velocity[i] > self.velocity_max] = self.velocity_max
-                self.velocity[i][self.velocity[i] < self.velocity_max] = -self.velocity_max
-
-        return None
-
-    def update_position(self):
-        """Move the candidates based on their velocities"""
-        for i in range(self.num_candidates):
-            self.pos[i] += self.velocity[i]
-        return None
 
     def check_boundaries(self):
         """Check if candidates left the search space, and bring them back."""
@@ -378,18 +278,4 @@ class Swarm(object):
     def get_fitness(self):
         """evaluate the fitness of the candidates in the current position."""
         self.fit = self.candidate.eval_fitness(self.pos)
-        return None
-
-    def update_personal_bests(self):
-        """Update the personal best fitness and position if better ones found"""
-
-        for i in range(self.num_candidates):
-            if self.extrema == 'min':
-                if self.fit[i] < self.best_fit[i]:
-                    self.best_fit[i] = self.fit[i]
-                    self.best_pos[i] = np.copy(self.pos[i])
-            elif self.extrema == 'max':
-                if self.fit[i] > self.best_fit[i]:
-                    self.best_fit[i] = self.fit[i]
-                    self.best_pos[i] = np.copy(self.pos[i])
         return None
