@@ -94,7 +94,7 @@ class Swarm(object):
         self.current_iteration = kwargs.get('current_iteration', 0)
         self.velocity_max = kwargs.get('velocity_max', 0.1)
         self.extrema = kwargs.get('extrema', 'min')
-        self.num_candidates = kwargs.get('num_candidates', 20)
+        self.num_candidates = kwargs.get('num_candidates', 30)
         assert (self.num_candidates % 10 == 0), "Number of candidates must be divisble by 10"
         self.verbose = kwargs.get('verbose', False)
 
@@ -182,10 +182,9 @@ class Swarm(object):
 
     def update_targets_global(self):
         """The specific target update for the global topology"""
-        pso_type = self.pso_type
-        if pso_type == "standard" or pso_type == "constriction":
+        if self.pso_type == "standard" or self.pso_type == "constriction":
             self.target[...] = self.gbest_id
-        elif pso_type == "fdr" or pso_type == "fdrs":
+        elif self.pso_type == "fdr" or self.pso_type == "fdrs":
             for i in range(self.num_candidates):
                 fdr, next_fdr = 0.0, 0.0
                 if i == 0:
@@ -235,7 +234,6 @@ class Swarm(object):
                     self.target[i] = target
                 else:
                     self.target[i] = -target
-        return None
 
     def update_targets_von_neumann(self):
         """The specific target update for the von neumann topology"""
@@ -246,15 +244,15 @@ class Swarm(object):
             if pso_type == "standard" or pso_type == "constriction":
                 self.target[i] = neighbor[0]
                 neighbor_fitness = self.best_fit[neighbor[0]]
-                for i in range(1, 4):
+                for j in range(1, 4):
                     if self.extrema == 'min':
-                        if self.best_fit[neighbor[i]] < neighbor_fitness:
-                            self.target[i] = neighbor[i]
-                            neighbor_fitness = self.best_fit[neighbor[i]]
+                        if self.best_fit[neighbor[j]] < neighbor_fitness:
+                            self.target[i] = neighbor[j]
+                            neighbor_fitness = self.best_fit[neighbor[j]]
                     elif self.extrema == 'max':
-                        if self.best_fit[neighbor[i]] > neighbor_fitness:
-                            self.target[i] = neighbor[i]
-                            neighbor_fitness = self.best_fit[neighbor[i]]
+                        if self.best_fit[neighbor[j]] > neighbor_fitness:
+                            self.target[i] = neighbor[j]
+                            neighbor_fitness = self.best_fit[neighbor[j]]
             elif pso_type == "fdr" or pso_type == "fdrs":
                 fdr, next_fdr = 0.0, 0.0
                 if i == 0:
@@ -276,8 +274,7 @@ class Swarm(object):
                             fdr = next_fdr
                             self.target[i] = j
             else:
-                raise NotImplementedError('von neumann topology for pso type:', pso_type)
-        return None
+                raise NotImplementedError('von neumann topology not implemented for pso type:', pso_type)
 
     def get_von_neumann_neighbors(self, candidate_number):
         """This method gets the von neumann neighbors of a given candidate in the swarm"""
@@ -352,9 +349,8 @@ class Swarm(object):
             raise NotImplementedError("Unknown PSO type:", self.pso_type)
 
         for i in range(self.num_candidates):
-            for i in range(self.num_candidates):
-                self.velocity[i][self.velocity[i] > self.velocity_max] = self.velocity_max
-                self.velocity[i][self.velocity[i] < self.velocity_max] = -self.velocity_max
+            self.velocity[i][self.velocity[i] > self.velocity_max] = self.velocity_max
+            self.velocity[i][self.velocity[i] < -self.velocity_max] = -self.velocity_max
 
         return None
 
