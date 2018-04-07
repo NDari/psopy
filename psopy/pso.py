@@ -63,6 +63,8 @@ class Swarm(object):
         assert len(lower_bounds) == len(upper_bounds), "Length of upper and lower bounds must match"
         assert np.all(np.greater(upper_bounds, lower_bounds)), "Upper bounds less than lower bounds"
         self.num_dims = len(upper_bounds)
+        self.extrema = kwargs.get('extrema', 'min')
+        assert self.extrema in ["min", "max"], "The value of 'extrema' must be 'min' or 'max'"
 
         self.fit = np.zeros(shape=(self.num_candidates), dtype=np.float)
         self.best_fit = np.zeros(shape=(self.num_candidates), dtype=np.float)
@@ -85,18 +87,12 @@ class Swarm(object):
         self.gbest_id = 0
         self.gbest_fit = self.best_fit[0]
         if self.extrema == "min":
-            for i in range(self.num_candidates):
-                if self.best_fit[i] < self.gbest_fit:
-                    self.gbest_fit = self.best_fit[i]
-                    self.gbest_id = i
-            self.gbest_pos = np.copy(self.best_pos[self.gbest_id])
+            self.gbest_id = np.argmin(self.best_fit)
         elif self.extrema == "max":
-            for i in range(self.num_candidates):
-                if self.best_fit[i] > self.gbest_fit:
-                    self.gbest_fit = self.best_fit[i]
-                    self.gbest_id = i
-            self.gbest_pos = np.copy(self.best_pos[self.gbest_id])
+            self.gbest_id = np.argmax(self.best_fit)
 
+        self.gbest_fit = self.best_fit[self.gbest_id]
+        self.gbest_pos = np.copy(self.best_pos[self.gbest_id])
         return None
 
     def run_iterations(self):
@@ -141,10 +137,9 @@ class Swarm(object):
 
     def update_targets_global(self):
         """The specific target update for the global topology"""
-        pso_type = self.pso_type
-        if pso_type == "standard" or pso_type == "constriction":
+        if self.pso_type == "standard" or self.pso_type == "constriction":
             self.target[...] = self.gbest_id
-        elif pso_type == "fdr" or pso_type == "fdrs":
+        elif self.pso_type == "fdr" or self.pso_type == "fdrs":
             for i in range(self.num_candidates):
                 fdr, next_fdr = 0.0, 0.0
                 if i == 0:
@@ -168,7 +163,7 @@ class Swarm(object):
                             fdr = next_fdr
                             self.target[i] = j
         else:
-            raise NotImplementedError('Global topology not implemented for pso type:', pso_type)
+            raise NotImplementedError('Global topology not implemented for pso type:', self.pso_type)
         return None
 
     def update_targets_random(self):
@@ -201,8 +196,7 @@ class Swarm(object):
 
         for i in range(self.num_candidates):
             neighbor = self.get_von_neumann_neighbors(i)
-            pso_type = self.pso_type
-            if pso_type == "standard" or pso_type == "constriction":
+            if self.pso_type in ["standard", "constriction"]:
                 self.target[i] = neighbor[0]
                 neighbor_fitness = self.best_fit[neighbor[0]]
                 for i in range(1, 4):
@@ -214,7 +208,7 @@ class Swarm(object):
                         if self.best_fit[neighbor[i]] > neighbor_fitness:
                             self.target[i] = neighbor[i]
                             neighbor_fitness = self.best_fit[neighbor[i]]
-            elif pso_type == "fdr" or pso_type == "fdrs":
+            elif self.pso_type in ["fdr", "fdrs"]:
                 fdr, next_fdr = 0.0, 0.0
                 if i == 0:
                     self.target[i] = neighbor[0]
@@ -235,7 +229,7 @@ class Swarm(object):
                             fdr = next_fdr
                             self.target[i] = j
             else:
-                raise NotImplementedError('von neumann topology for pso type:', pso_type)
+                raise NotImplementedError('von neumann topology for pso type:', self.pso_type)
         return None
 
     def get_von_neumann_neighbors(self, candidate_number):
