@@ -3,7 +3,7 @@
 import unittest
 import numpy as np
 #from psopy import Candidate, solver
-import psopy.pso as pso
+from context import pso
 
 
 class CandidateHelper(pso.Candidate):
@@ -46,7 +46,7 @@ class TestPSO(unittest.TestCase):
             fitness, position = pso.solver(BadCandidateHelper())
         except Exception as ex:
             self.assertEqual(ex.args[0], "Upper bounds less than lower bounds",
-            "Did not catch exception")
+                             "Did not catch exception")
 
         fitness, position = pso.solver(CandidateHelper())
         self.assertEqual(round(fitness), 0.0, "Found fitness is not 0.0")
@@ -78,5 +78,7 @@ class TestPSO(unittest.TestCase):
         self.assertEqual(round(fitness), 0.0, "Found fitness is not 0.0")
         self.assertEqual(round(position[0]), 0.0, "Position[0] not at 0")
         self.assertEqual(round(position[1]), 0.0, "Position[1] not at 0")
+
+
 if __name__ == "__main__":
     unittest.main()
