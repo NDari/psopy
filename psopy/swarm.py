@@ -14,7 +14,7 @@ class Swarm():
         self.topology = kwargs.get('topology', 'global')
         self.pso_type = kwargs.get('pso_type', 'constriction')
         self.verbose = kwargs.get('verbose', False)
-        self.num_candidates = len(candidates)
+        self.num_candidates = kwargs.get('num_candidates', 40)
 
         self.queen = queen
         self.best_fitness = None

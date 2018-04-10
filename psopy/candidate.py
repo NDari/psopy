@@ -6,25 +6,26 @@ from math import sqrt
 import numpy as np
 
 class Candidate(ABC):
-    """ Candidate is a potential extrema in a n-dimensional space. """
+    """
+    Candidate represents a possible solution to an optimization problem
+    in a n-dimensional space.
+    """
 
     # pylint: disable=too-many-instance-attributes
     def __init__(self, position, **kwargs):
-        self.cognative_acceleration = kwargs.get('cognative_acceleration', 2.05)
-        self.social_acceleration = kwargs.get('social_acceleration', 2.05)
-        self.chi = kwargs.get('chi', self.calculate_chi)
-        self.pso_type = kwargs.get('pso_type', 'constriction')
-        self.extrema = kwargs.get('extrema', 'min')
+        self.cognative_acceleration_coeff = kwargs.get('cognative_acceleration_coeff', 2.05)
+        self.social_acceleration_coeff = kwargs.get('social_acceleration_coeff', 2.05)
+        self.chi = self.calculate_chi
         self.upper_bounds = kwargs.get('upper_bounds', None)
         self.lower_bounds = kwargs.get('lower_bounds', None)
-        self.position = position
-        self.best_position = position
+        self.position = np.copy(position)
+        self.best_position = np.copy(position)
         self.target_position = None
         self.fitness = None
         self.best_fitness = None
         self.target_fitness = None
         self.velocity = np.zeros_like(position)
-        self.enforce_input_correctness
+        self.ensure_correct_input()
 
     @abstractmethod
     def eval(self):
@@ -47,12 +48,12 @@ class Candidate(ABC):
         has no suitable target. In these cases, calling this method without
         a target will achieve the desired result.
         """
-        if target_candidate is None:
-            self.target_fitness = self.best_fitness
-            self.target_position = self.best_position.view()
-        else:
+        if target_candidate:
             self.target_fitness = target_candidate.best_fitness
             self.target_position = target_candidate.best_position.view()
+            return
+        self.target_fitness = self.best_fitness
+        self.target_position = self.best_position.view()
 
     def iterate_once(self):
         """
@@ -72,16 +73,19 @@ class Candidate(ABC):
         self.update_personal_best()
 
 
-    def update_velocity(self):
-        """ Determine the velocity of the candidate based on the target """
-        # determine if we need to move toward or away from the target.
-        direction = -1.0 if self.target_is_less_fit else 1.0
-
+    def update_velocity(self, worst_fitness=None, best_fitness=None):
+        """
+        Determine the velocity of the candidate based on the target.
+        """
         # .shape returns a tuple, so we need to unzip it with the *.
-        rand_set1 = self.cognative_acceleration * np.random.rand(*self.velocity.shape)
-        rand_set2 = self.social_acceleration * np.random.rand(*self.velocity.shape)
-        cognative_a = rand_set1 * (self.best_position - self.position)
-        social_a = (rand_set2 * (self.target_position - direction * self.position))
+        r1 = self.cognative_acceleration_coeff * np.random.rand(*self.velocity.shape)
+        r2 = self.social_acceleration_coeff * np.random.rand(*self.velocity.shape)
+        cog_distance = r1 * (self.best_position - self.position)
+        social_distance = r2 * (self.target_position - self.position)
+
+        mass_scale = worst_fitness - best_fitness
+        cog_mass_ratio = (self.fitness - self.best_fitness) / mass_scale
+        soc_mass_ratio = (self.fitness - target_fitness) / mass_scale
 
         self.velocity = self.chi * (self.velocity + cognative_a + social_a)
 
@@ -112,7 +116,7 @@ class Candidate(ABC):
     @property
     def calculate_chi(self):
         """ Calculate chi based on congnative and social accelerations. """
-        phi = self.cognative_acceleration + self.social_acceleration
+        phi = self.cognative_acceleration_coeff + self.social_acceleration_coeff
         return (2.0 / abs(2.0 - phi - sqrt((phi * phi) - (4.0 * phi))))
 
     @property
@@ -149,7 +153,7 @@ class Candidate(ABC):
         return self.upper_bounds != None and self.lower_bounds != None
 
     @property
-    def enforce_input_correctness(self):
+    def ensure_correct_input(self):
         """ Make sure that the inputs are of the correct values and shapes """
         if self.has_defined_boundaries:
             assert self.lower_bounds.shape == self.upper_bounds.shape
