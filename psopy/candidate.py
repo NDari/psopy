@@ -5,6 +5,7 @@ from abc import ABC, abstractmethod
 from math import sqrt
 import numpy as np
 
+
 class Candidate(ABC):
     """
     Candidate represents a possible solution to an optimization problem
@@ -72,7 +73,6 @@ class Candidate(ABC):
         self.apply_boundary_conditions()
         self.update_personal_best()
 
-
     def update_velocity(self, worst_fitness=None, best_fitness=None):
         """
         Determine the velocity of the candidate based on the target.
@@ -80,12 +80,15 @@ class Candidate(ABC):
         # .shape returns a tuple, so we need to unzip it with the *.
         r1 = self.cognative_acceleration_coeff * np.random.rand(*self.velocity.shape)
         r2 = self.social_acceleration_coeff * np.random.rand(*self.velocity.shape)
-        cog_distance = r1 * (self.best_position - self.position)
-        social_distance = r2 * (self.target_position - self.position)
+        cog_distance = self.best_position - self.position
+        soc_distance = (self.target_position - self.position)
 
         mass_scale = worst_fitness - best_fitness
         cog_mass_ratio = (self.fitness - self.best_fitness) / mass_scale
-        soc_mass_ratio = (self.fitness - target_fitness) / mass_scale
+        soc_mass_ratio = (self.fitness - self.target_fitness) / mass_scale
+
+        cognative_a = r1 * cog_mass_ratio * cog_distance
+        social_a = r2 * soc_mass_ratio * soc_distance
 
         self.velocity = self.chi * (self.velocity + cognative_a + social_a)
 
@@ -112,6 +115,16 @@ class Candidate(ABC):
         if self.better_personal_fitness_found:
             np.copyto(self.best_position, self.position)
             self.best_fitness = self.fitness
+
+
+    def ensure_correct_input(self):
+        """ Make sure that the inputs are of the correct values and shapes """
+        if self.has_defined_boundaries:
+            assert self.lower_bounds.shape == self.upper_bounds.shape
+            assert self.position.shape == self.upper_bounds.shape
+            assert np.all(np.greater(self.upper_bounds, self.lower_bounds))
+            assert np.all(np.greater(self.position, self.lower_bounds))
+            assert np.all(np.less(self.position, self.upper_bounds))
 
     @property
     def calculate_chi(self):
@@ -152,13 +165,4 @@ class Candidate(ABC):
         """ Is the search space unconstrained? """
         return self.upper_bounds != None and self.lower_bounds != None
 
-    @property
-    def ensure_correct_input(self):
-        """ Make sure that the inputs are of the correct values and shapes """
-        if self.has_defined_boundaries:
-            assert self.lower_bounds.shape == self.upper_bounds.shape
-            assert self.position.shape == self.upper_bounds.shape
-            assert np.all(np.greater(self.upper_bounds, self.lower_bounds))
-            assert np.all(np.greater(self.position, self.lower_bounds))
-            assert np.all(np.less(self.position, self.upper_bounds))
 
